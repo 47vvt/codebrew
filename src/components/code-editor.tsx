@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react"
 
-export default function CodeEditor({ code, onChange }) {
-  const editorRef = useRef(null)
+interface CodeEditorProps {
+  code: string
+  onChange: (code: string) => void
+}
+
+export default function CodeEditor({ code, onChange }: CodeEditorProps) {
+  const editorRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const handleTabKey = (e) => {
+    const handleTabKey = (e: KeyboardEvent) => {
       if (e.key === "Tab" && document.activeElement === editorRef.current) {
         e.preventDefault()
 

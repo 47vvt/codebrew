@@ -8,13 +8,13 @@ import GraphArray from "./graph-array"
 import AlgorithmSelector from "./algorithm-selector"
 
 export default function GraphVisualizer() {
-  const [nodes, setNodes] = useState([
+  const [nodes, setNodes] = useState<Array<{ id: number; x: number; y: number }>>([
     { id: 1, x: 100, y: 100 },
     { id: 2, x: 200, y: 150 },
     { id: 3, x: 150, y: 250 },
   ])
 
-  const [edges, setEdges] = useState([
+  const [edges, setEdges] = useState<Array<{ from: number; to: number }>>([
     { from: 1, to: 2 },
     { from: 2, to: 3 },
     { from: 3, to: 1 },
@@ -40,27 +40,27 @@ function bfs(graph, startNode) {
   }
 }`)
 
-  const handleAddNode = (x, y) => {
+  const handleAddNode = (x: number, y: number) => {
     const newId = nodes.length > 0 ? Math.max(...nodes.map((n) => n.id)) + 1 : 1
     setNodes([...nodes, { id: newId, x, y }])
   }
 
-  const handleAddEdge = (from, to) => {
+  const handleAddEdge = (from: number, to: number) => {
     if (from !== to && !edges.some((e) => e.from === from && e.to === to)) {
       setEdges([...edges, { from, to }])
     }
   }
 
-  const handleDeleteNode = (id) => {
+  const handleDeleteNode = (id: number) => {
     setNodes(nodes.filter((node) => node.id !== id))
     setEdges(edges.filter((edge) => edge.from !== id && edge.to !== id))
   }
 
-  const handleDeleteEdge = (from, to) => {
+  const handleDeleteEdge = (from: number, to: number) => {
     setEdges(edges.filter((edge) => !(edge.from === from && edge.to === to)))
   }
 
-  const handleAlgorithmChange = (algorithm) => {
+  const handleAlgorithmChange = (algorithm: string) => {
     setSelectedAlgorithm(algorithm)
 
     // Update code based on selected algorithm
@@ -135,7 +135,7 @@ function dijkstra(graph, startNode) {
 
   // Convert graph to adjacency list representation
   const graphAsArray = () => {
-    const graph = {}
+    const graph: Record<number, number[]> = {}
 
     // Initialize all nodes with empty arrays
     nodes.forEach((node) => {

@@ -1,6 +1,11 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-export default function AlgorithmSelector({ selectedAlgorithm, onAlgorithmChange }) {
+interface AlgorithmSelectorProps {
+  selectedAlgorithm: string
+  onAlgorithmChange: (algorithm: string) => void
+}
+
+export default function AlgorithmSelector({ selectedAlgorithm, onAlgorithmChange }: AlgorithmSelectorProps) {
   return (
     <Select value={selectedAlgorithm} onValueChange={onAlgorithmChange}>
       <SelectTrigger className="w-[180px]">

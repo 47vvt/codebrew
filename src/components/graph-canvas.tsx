@@ -1,17 +1,46 @@
 "use client"
 
+import type React from "react"
+
 import { useRef, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, MousePointer, Share2, Trash2 } from "lucide-react"
 
-export default function GraphCanvas({ nodes, edges, onAddNode, onAddEdge, onDeleteNode, onDeleteEdge }) {
-  const canvasRef = useRef(null)
-  const [mode, setMode] = useState("select")
-  const [selectedNode, setSelectedNode] = useState(null)
-  const [hoveredNode, setHoveredNode] = useState(null)
-  const [hoveredEdge, setHoveredEdge] = useState(null)
+interface Node {
+  id: number
+  x: number
+  y: number
+}
+
+interface Edge {
+  from: number
+  to: number
+}
+
+interface GraphCanvasProps {
+  nodes: Node[]
+  edges: Edge[]
+  onAddNode: (x: number, y: number) => void
+  onAddEdge: (from: number, to: number) => void
+  onDeleteNode: (id: number) => void
+  onDeleteEdge: (from: number, to: number) => void
+}
+
+export default function GraphCanvas({
+  nodes,
+  edges,
+  onAddNode,
+  onAddEdge,
+  onDeleteNode,
+  onDeleteEdge,
+}: GraphCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [mode, setMode] = useState<"select" | "addNode" | "addEdge" | "delete">("select")
+  const [selectedNode, setSelectedNode] = useState<number | null>(null)
+  const [hoveredNode, setHoveredNode] = useState<number | null>(null)
+  const [hoveredEdge, setHoveredEdge] = useState<{ from: number; to: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [draggedNode, setDraggedNode] = useState(null)
+  const [draggedNode, setDraggedNode] = useState<number | null>(null)
 
   const NODE_RADIUS = 20
   const NODE_COLOR = "#ffffff"
@@ -140,7 +169,7 @@ export default function GraphCanvas({ nodes, edges, onAddNode, onAddEdge, onDele
     }
 
     // Animation loop
-    let animationFrameId
+    let animationFrameId: number
     const animate = () => {
       draw()
       animationFrameId = requestAnimationFrame(animate)
@@ -158,7 +187,7 @@ export default function GraphCanvas({ nodes, edges, onAddNode, onAddEdge, onDele
   const [lastMouseX, setLastMouseX] = useState(0)
   const [lastMouseY, setLastMouseY] = useState(0)
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -234,7 +263,7 @@ export default function GraphCanvas({ nodes, edges, onAddNode, onAddEdge, onDele
     }
   }
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -286,7 +315,7 @@ export default function GraphCanvas({ nodes, edges, onAddNode, onAddEdge, onDele
     }
   }
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isDragging && draggedNode !== null) {
       const canvas = canvasRef.current
       if (!canvas) return
