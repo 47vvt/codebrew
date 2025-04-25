@@ -90,7 +90,12 @@ export default function GraphVisualizer() {
     try {
       const boilerplate = library
       const graph = graphAsArray()
-      const code_input = boilerplate + code + `\ngraph = ${JSON.stringify(graph, null, 2)}` + "\nmain(graph)"
+      const adj= `{
+        ${Object.entries(graph)
+          .map(([k, v]) => `${k}: [${v.join(", ")}]`)
+          .join(",\n  ")}
+      }`
+      const code_input = boilerplate + code + `\ngraph = ${adj}` + "\nmain(graph)"
       const result = await runPython(code_input)
       console.log(result.split(/\r?\n/))
       processGraphCommands(result.split(/\r?\n/)).then(()=>console.log(edges))
