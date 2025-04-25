@@ -33,33 +33,27 @@ type GraphCanvasProps = {
 type Mode = "select" | "addNode" | "addEdge" | "delete"
 
 export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphCanvasProps) {
-  const svgRef = useRef<SVGSVGElement | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<Mode>("select")
   const [selectedNode, setSelectedNode] = useState<number | null>(null)
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [draggingNode, setDraggingNode] = useState<number | null>(null)
   const [nextNodeId, setNextNodeId] = useState(1)
 
-  // Handle SVG click
-  const handleSvgClick = (event: React.MouseEvent<SVGSVGElement>) => {
-    const svg = svgRef.current
-    if (!svg) return
+  // Handle container click for adding nodes
+  const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (mode !== "addNode") return
 
-    if (mode === "addNode") {
-      // Get the SVG's bounding rectangle
-      const rect = svg.getBoundingClientRect()
+    // Get click position relative to the container
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
 
-      // Calculate the click position relative to the SVG
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
 
-      // Use nextNodeId for the new node ID and increment it
-      setNodes((prev) => [...prev, { id: nextNodeId, x, y }])
-      setNextNodeId(nextNodeId + 1)
-    } else if (mode === "select") {
-      // Clicking background deselects
-      setSelectedNode(null)
-    }
+    // Add a new node at the click position
+    setNodes((prev) => [...prev, { id: nextNodeId, x, y }])
+    setNextNodeId(nextNodeId + 1)
   }
 
   // Handle node click
@@ -111,13 +105,10 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
   }
 
   // Handle mouse move for dragging
-  const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    if (draggingNode === null || !svgRef.current) return
+  const handleMouseMove = (event: React.MouseEvent) => {
+    if (draggingNode === null || !containerRef.current) return
 
-    // Get the SVG's bounding rectangle
-    const rect = svgRef.current.getBoundingClientRect()
-
-    // Calculate the mouse position relative to the SVG
+    const rect = containerRef.current.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
 
@@ -232,122 +223,122 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
         </Button>
       </div>
 
-      <div className="relative flex-1 border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900">
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="100%"
-          className="w-full h-full"
-          onClick={handleSvgClick}
-          onMouseMove={handleMouseMove}
-        >
-          {/* Edges */}
-          {edges.map((edge, i) => {
-            const source = nodes.find((n) => n.id === edge.from)
-            const target = nodes.find((n) => n.id === edge.to)
+      <div
+        ref={containerRef}
+        className="relative flex-1 border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900"
+        onClick={handleContainerClick}
+        onMouseMove={handleMouseMove}
+      >
+        {/* Render edges */}
+        {edges.map((edge, i) => {
+          const source = nodes.find((n) => n.id === edge.from)
+          const target = nodes.find((n) => n.id === edge.to)
 
-            if (!source || !target) return null
+          if (!source || !target) return null
 
-            const edgeColor = edge.color || "black"
-            const strokeWidth = edge.animating ? 3 : 2
-            const strokeDasharray = edge.animating ? "5,5" : "none"
+          const edgeColor = edge.color || "black"
+          const strokeWidth = edge.animating ? 3 : 2
+          const strokeDasharray = edge.animating ? "5,5" : "none"
 
-            return (
-              <line
-                key={`edge-${i}`}
-                x1={source.x}
-                y1={source.y}
-                x2={target.x}
-                y2={target.y}
-                stroke={edgeColor}
-                strokeWidth={strokeWidth}
-                strokeDasharray={strokeDasharray}
-                className={`transition-all duration-300 ${edge.animating ? "animate-pulse" : ""}`}
-                onClick={(e) => handleEdgeClick(edge, e)}
-                style={{ cursor: mode === "delete" ? "pointer" : "default" }}
-              />
-            )
-          })}
-
-          {/* Line for edge creation */}
-          {mode === "addEdge" &&
-            selectedNode !== null &&
-            hoveredNode !== null &&
-            selectedNode !== hoveredNode &&
-            (() => {
-              const fromNode = nodes.find((n) => n.id === selectedNode)
-              const toNode = nodes.find((n) => n.id === hoveredNode)
-
-              if (!fromNode || !toNode) return null
-
-              return (
+          return (
+            <div
+              key={`edge-${i}`}
+              className={`absolute top-0 left-0 w-full h-full pointer-events-none ${edge.animating ? "animate-pulse" : ""}`}
+              style={{
+                zIndex: 1,
+              }}
+            >
+              <svg width="100%" height="100%" className="absolute top-0 left-0">
                 <line
-                  x1={fromNode.x}
-                  y1={fromNode.y}
-                  x2={toNode.x}
-                  y2={toNode.y}
-                  stroke="gray"
-                  strokeWidth={2}
-                  strokeDasharray="5,5"
-                  pointerEvents="none"
+                  x1={source.x}
+                  y1={source.y}
+                  x2={target.x}
+                  y2={target.y}
+                  stroke={edgeColor}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={strokeDasharray}
+                  className="transition-all duration-300 pointer-events-auto"
+                  onClick={(e) => handleEdgeClick(edge, e)}
+                  style={{ cursor: mode === "delete" ? "pointer" : "default" }}
                 />
-              )
-            })()}
+              </svg>
+            </div>
+          )
+        })}
 
-          {/* Nodes */}
-          {nodes.map((node) => {
-            const isSelected = node.id === selectedNode
-            const isHovered = node.id === hoveredNode
-            const isDragging = node.id === draggingNode
+        {/* Line for edge creation */}
+        {mode === "addEdge" &&
+          selectedNode !== null &&
+          hoveredNode !== null &&
+          selectedNode !== hoveredNode &&
+          (() => {
+            const fromNode = nodes.find((n) => n.id === selectedNode)
+            const toNode = nodes.find((n) => n.id === hoveredNode)
 
-            let nodeColor = node.color || "#69b3a2" // Default color
-
-            if (isSelected && !node.color) nodeColor = "orange"
-
-            const nodeSize = node.animating ? 24 : 20
-            const strokeWidth = isSelected || isHovered ? 3 : 1.5
-            const strokeColor = (() => {
-              if (isSelected) return "#3b82f6" // Blue for selected
-              if (isHovered && mode === "addEdge") return "#10b981" // Green for potential edge
-              if (isHovered && mode === "delete") return "#ef4444" // Red for delete
-              return "black"
-            })()
+            if (!fromNode || !toNode) return null
 
             return (
-              <g
-                key={`node-${node.id}`}
-                transform={`translate(${node.x}, ${node.y})`}
-                className={`transition-transform duration-150 ${node.animating ? "animate-pulse" : ""}`}
-                style={{
-                  cursor: mode === "select" ? "move" : "pointer",
-                  transform: isDragging ? "scale(1.1)" : "scale(1)",
-                }}
-                onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
-                onClick={(e) => handleNodeClick(node.id, e)}
-                onMouseEnter={() => setHoveredNode(node.id)}
-                onMouseLeave={() => setHoveredNode(null)}
-              >
-                <circle
-                  r={nodeSize}
-                  fill={nodeColor}
-                  stroke={strokeColor}
-                  strokeWidth={strokeWidth}
-                  className="transition-all duration-300"
-                />
-                <text
-                  textAnchor="middle"
-                  y={5}
-                  fontSize={14}
-                  fill="black"
-                  pointerEvents="none"
-                  fontWeight={isSelected ? "bold" : "normal"}
-                >
-                  {node.id}
-                </text>
-              </g>
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                <svg width="100%" height="100%" className="absolute top-0 left-0">
+                  <line
+                    x1={fromNode.x}
+                    y1={fromNode.y}
+                    x2={toNode.x}
+                    y2={toNode.y}
+                    stroke="gray"
+                    strokeWidth={2}
+                    strokeDasharray="5,5"
+                  />
+                </svg>
+              </div>
             )
-          })}
-        </svg>
+          })()}
+
+        {/* Render nodes */}
+        {nodes.map((node) => {
+          const isSelected = node.id === selectedNode
+          const isHovered = node.id === hoveredNode
+          const isDragging = node.id === draggingNode
+
+          let nodeColor = node.color || "#69b3a2" // Default color
+
+          if (isSelected && !node.color) nodeColor = "orange"
+
+          const nodeSize = node.animating ? 24 : 20
+          const borderWidth = isSelected || isHovered ? 3 : 1.5
+          const borderColor = (() => {
+            if (isSelected) return "#3b82f6" // Blue for selected
+            if (isHovered && mode === "addEdge") return "#10b981" // Green for potential edge
+            if (isHovered && mode === "delete") return "#ef4444" // Red for delete
+            return "black"
+          })()
+
+          return (
+            <div
+              key={`node-${node.id}`}
+              className={`absolute rounded-full flex items-center justify-center transition-all duration-150 ${
+                node.animating ? "animate-pulse" : ""
+              }`}
+              style={{
+                left: node.x - nodeSize,
+                top: node.y - nodeSize,
+                width: nodeSize * 2,
+                height: nodeSize * 2,
+                backgroundColor: nodeColor,
+                border: `${borderWidth}px solid ${borderColor}`,
+                cursor: mode === "select" ? "move" : "pointer",
+                zIndex: isDragging ? 10 : 2,
+                transform: isDragging ? "scale(1.1)" : "scale(1)",
+              }}
+              onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
+              onClick={(e) => handleNodeClick(node.id, e)}
+              onMouseEnter={() => setHoveredNode(node.id)}
+              onMouseLeave={() => setHoveredNode(null)}
+            >
+              <span className="text-xs text-white font-bold">{node.id}</span>
+            </div>
+          )
+        })}
 
         {/* Instructions */}
         {nodes.length === 0 && (
