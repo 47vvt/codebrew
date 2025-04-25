@@ -10,13 +10,15 @@ export async function runPython(code: string): Promise<string> {
   let output = ""
 
   pyodide.setStdout({
-    batched: (text: string) => {
-      output += text
-    },
+    raw: (text: string | number) => {
+      const char = typeof text === 'number' ? String.fromCharCode(text) : text
+      output += char;
+    }
   })
 
   try {
     await pyodide.runPythonAsync(code)
+    console.log(JSON.stringify(output))
     return output
   } catch (err) {
     return `Error: ${err}`

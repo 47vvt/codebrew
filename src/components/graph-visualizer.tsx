@@ -10,41 +10,13 @@ import algorithmTemplates from "@/lib/algorithms"
 import { runPython } from "./utils/pyodide-runner" // Import runPython if it's in another file
 
 export default function GraphVisualizer() {
-  const [nodes, setNodes] = useState([
-    { id: 1, x: 100, y: 100 },
-    { id: 2, x: 200, y: 150 },
-    { id: 3, x: 150, y: 250 },
-  ])
-
-  const [edges, setEdges] = useState([
-    { from: 1, to: 2 },
-    { from: 2, to: 3 },
-    { from: 3, to: 1 },
-  ])
 
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("bfs")
   const [code, setCode] = useState(algorithmTemplates["bfs"] || "")
   const [output, setOutput] = useState("")
 
-  const handleAddNode = (x: number, y: number) => {
-    const newId = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 1
-    setNodes([...nodes, { id: newId, x, y }])
-  }
-
-  const handleAddEdge = (from: number, to: number) => {
-    if (from !== to && !edges.some(e => e.from === from && e.to === to)) {
-      setEdges([...edges, { from, to }])
-    }
-  }
-
-  const handleDeleteNode = (id: number) => {
-    setNodes(nodes.filter(node => node.id !== id))
-    setEdges(edges.filter(edge => edge.from !== id && edge.to !== id))
-  }
-
-  const handleDeleteEdge = (from: number, to: number) => {
-    setEdges(edges.filter(edge => !(edge.from === from && edge.to === to)))
-  }
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
 
   const handleAlgorithmChange = (algorithm: string) => {
     setSelectedAlgorithm(algorithm)
@@ -81,13 +53,11 @@ export default function GraphVisualizer() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 border-r p-4 flex flex-col">
-          <GraphCanvas
+          <GraphCanvas 
             nodes={nodes}
             edges={edges}
-            onAddNode={handleAddNode}
-            onAddEdge={handleAddEdge}
-            onDeleteNode={handleDeleteNode}
-            onDeleteEdge={handleDeleteEdge}
+            setNodes={setNodes}
+            setEdges={setEdges}
           />
         </div>
 
