@@ -18,7 +18,6 @@ export async function runPython(code: string): Promise<string> {
 
   try {
     await pyodide.runPythonAsync(code)
-    console.log(JSON.stringify(output))
     return output
   } catch (err) {
     return `Error: ${err}`

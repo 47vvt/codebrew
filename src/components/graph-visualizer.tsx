@@ -8,6 +8,10 @@ import GraphArray from "./graph-array"
 import AlgorithmSelector from "./algorithm-selector"
 import algorithmTemplates from "@/lib/algorithms"
 import { runPython } from "./utils/pyodide-runner" // Import runPython if it's in another file
+import library from "@/lib/library"
+
+type Node = { id: number; x: number; y: number; color?: string };
+type Edge = { from: number; to: number };
 
 export default function GraphVisualizer() {
 
@@ -18,21 +22,78 @@ export default function GraphVisualizer() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
 
+
+  async function processGraphCommands(
+    commands: string[],
+  ) {
+    const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+    for (const cmd of commands) {
+      if (!cmd.startsWith("__GRAPH__")) continue;
+
+      const parts = cmd.split(" ");
+      const action = parts[1];
+      await delay(100); // half-second delay between commands
+
+      if (action === "colour" && parts[2]) {
+        const targetId = parseInt(parts[2]);
+        setNodes(prev =>
+          prev.map(n => n.id === targetId ? { ...n, color: "red" } : n)
+        );
+      }
+
+      if (action === "traverse" && parts[2] && parts[3]) {
+        const from = parseInt(parts[2]);
+        const to = parseInt(parts[3]);
+        const exists = edges.some(
+          e => (e.from === from && e.to === to) || (e.from === to && e.to === from)
+        );
+
+        setEdges(prev => {
+
+          if (!exists) return prev; // no such edge — do nothing
+
+          return prev.map(e =>
+            (e.from === from && e.to === to) || (e.from === to && e.to === from)
+              ? { ...e, color: "blue" }
+              : e
+          );
+        });
+        setNodes(prev => {
+          if (!exists) return prev; // no such edge — do nothing
+          return prev.map(n =>
+            n.id === from || n.id === to ? { ...n, color: "blue" } : n
+          )
+        });
+      }
+
+    }
+  }
+
+
   const handleAlgorithmChange = (algorithm: string) => {
     setSelectedAlgorithm(algorithm)
-    setCode(algorithmTemplates[algorithm] || "// Algorithm not found")
+    setCode(algorithmTemplates[algorithm] || "# Algorithm not found")
   }
 
   const graphAsArray = () => {
     const graph: Record<number, number[]> = {}
     nodes.forEach(node => (graph[node.id] = []))
-    edges.forEach(edge => graph[edge.from].push(edge.to))
+    edges.forEach(edge => {
+      graph[edge.from].push(edge.to)
+      graph[edge.to].push(edge.from)
+    })
     return graph
   }
 
   const runAlgorithm = async () => {
     try {
-      const result = await runPython(code)
+      const boilerplate = library
+      const graph = graphAsArray()
+      const code_input = boilerplate + code + `\ngraph = ${JSON.stringify(graph, null, 2)}` + "\nmain(graph)"
+      const result = await runPython(code_input)
+      console.log(result.split(/\r?\n/))
+      processGraphCommands(result.split(/\r?\n/)).then(()=>console.log(edges))
       setOutput(result)
     } catch (err) {
       setOutput("Error executing Python code")

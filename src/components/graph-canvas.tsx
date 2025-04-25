@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import * as d3 from "d3";
 
-type Node = { id: number; x: number; y: number };
-type Edge = { source: number; target: number };
+type Node = { id: number; x: number; y: number; color?: string };
+type Edge = { from: number; to: number };
 
 interface StaticGraphProps {
   nodes: Node[];
@@ -29,12 +29,11 @@ export default function StaticGraph({nodes, setNodes, edges, setEdges}: StaticGr
     if (selected === null) {
       setSelected(id);
     } else if (selected !== id) {
-      setEdges((prev) => [...prev, { source: selected, target: id }]);
+      setEdges((prev) => [...prev, { from: selected, to: id }]);
       setSelected(null);
     } else {
       setSelected(null);
     }
-    console.log(edges)
   };
 
   const handleReset = () => {
@@ -60,35 +59,45 @@ export default function StaticGraph({nodes, setNodes, edges, setEdges}: StaticGr
         className="rounded-lg"
         onClick={handleSvgClick}
       >
-        {edges.map((edge, i) => {
-          const source = nodes.find((n) => n.id === edge.source)!;
-          const target = nodes.find((n) => n.id === edge.target)!;
-          return (
-            <line
-              key={i}
-              x1={source.x}
-              y1={source.y}
-              x2={target.x}
-              y2={target.y}
-              stroke="black"
-              strokeWidth={2}
-            />
-          );
-        })}
 
-        {nodes.map((node) => (
+      {edges.map((edge, i) => {
+        const source = nodes.find((n) => n.id === edge.from)!;
+        const target = nodes.find((n) => n.id === edge.to)!;
+        return (
+          <line
+            key={i}
+            x1={source.x}
+            y1={source.y}
+            x2={target.x}
+            y2={target.y}
+            stroke="black"
+            strokeWidth={2}
+          />
+        );
+      })}
+
+      {nodes.map((node) => (
+        <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
           <circle
-            key={node.id}
-            cx={node.x}
-            cy={node.y}
             r={20}
-            fill={node.id === selected ? "orange" : "#69b3a2"}
+            fill={node.color || (node.id === selected ? "orange" : "#69b3a2")}
             stroke="black"
             strokeWidth={1.5}
             onClick={(e) => handleNodeClick(node.id, e)}
             style={{ cursor: "pointer" }}
           />
-        ))}
+          <text
+            textAnchor="middle"
+            y={5}
+            fontSize={14}
+            fill="black"
+            pointerEvents="none"
+          >
+            {node.id}
+          </text>
+        </g>
+      ))}
+
       </svg>
     </div>
   </div>
