@@ -1,23 +1,24 @@
-// utils/pyodide-runner.ts
-
-import { loadPyodide } from "pyodide"
+import { loadPyodideAndPackages } from "./pyodide-loader"
 
 let pyodide: any = null
 
-export async function initPyodide() {
+export async function runPython(code: string): Promise<string> {
   if (!pyodide) {
-    pyodide = await loadPyodide()
+    pyodide = await loadPyodideAndPackages()
   }
-  return pyodide
-}
 
-export async function runPython(code: string): Promise<any> {
-  const py = await initPyodide()
+  let output = ""
+
+  pyodide.setStdout({
+    batched: (text: string) => {
+      output += text
+    },
+  })
+
   try {
-    const result = await py.runPythonAsync(code)
-    return result
+    await pyodide.runPythonAsync(code)
+    return output
   } catch (err) {
-    console.error("Python Error:", err)
-    throw err
+    return `Error: ${err}`
   }
 }

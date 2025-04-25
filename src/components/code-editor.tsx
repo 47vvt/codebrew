@@ -15,7 +15,7 @@ export default function CodeEditor({ code, onChange }: CodeEditorProps) {
         language="python"
         value={code}
         onChange={(value) => onChange(value ?? "")}
-        theme="vs-dark"
+        theme="vs-light"
         options={{
           fontSize: 14,
           minimap: { enabled: false },
