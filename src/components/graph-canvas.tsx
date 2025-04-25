@@ -38,23 +38,25 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
   const [selectedNode, setSelectedNode] = useState<number | null>(null)
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [draggingNode, setDraggingNode] = useState<number | null>(null)
-  const [nextNodeId, setNextNodeId] = useState(1)
 
   // Handle container click for adding nodes
   const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (mode !== "addNode") return
 
-    // Get click position relative to the container
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
 
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
 
-    // Add a new node at the click position
-    setNodes((prev) => [...prev, { id: nextNodeId, x, y }])
-    setNextNodeId(nextNodeId + 1)
+    setNodes((prev) => {
+      const existingIds = new Set(prev.map((n) => n.id))
+      let newId = 1
+      while (existingIds.has(newId)) newId++
+      return [...prev, { id: newId, x, y }]
+    })
   }
+ 
 
   // Handle node click
   const handleNodeClick = (id: number, event: React.MouseEvent) => {
@@ -125,7 +127,6 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
     setNodes([])
     setEdges([])
     setSelectedNode(null)
-    setNextNodeId(1)
   }
 
   // Set up event listeners

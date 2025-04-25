@@ -44,7 +44,7 @@ export default function GraphVisualizer() {
   const [output, setOutput] = useState("")
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  const [animationSpeed, setAnimationSpeed] = useState(500) // ms between steps
+  const [animationSpeed, setAnimationSpeed] = useState(500)
   const [isAnimating, setIsAnimating] = useState(false)
   const [animationQueue, setAnimationQueue] = useState<AnimationStep[]>([])
   const [currentStep, setCurrentStep] = useState(0)
@@ -52,7 +52,6 @@ export default function GraphVisualizer() {
   const animationRef = useRef<NodeJS.Timeout | null>(null)
   const [showLegend, setShowLegend] = useState(false)
 
-  // Reset all node and edge colors
   const resetVisualization = () => {
     setNodes((prev) => prev.map((node) => ({ ...node, color: undefined, animating: false })))
     setEdges((prev) => prev.map((edge) => ({ ...edge, color: undefined, animating: false })))
@@ -64,7 +63,6 @@ export default function GraphVisualizer() {
     }
   }
 
-  // Process the output from Python code to create animation steps
   const processGraphCommands = (commands: string[]) => {
     const steps: AnimationStep[] = []
 
@@ -88,8 +86,6 @@ export default function GraphVisualizer() {
         const from = Number.parseInt(parts[2])
         const to = Number.parseInt(parts[3])
         const color = parts[4] || "blue"
-
-        // Create a single step for the traversal that includes both the edge and nodes
         steps.push({
           type: "traversal",
           action: "traverse",
@@ -98,114 +94,73 @@ export default function GraphVisualizer() {
       }
     }
 
-    // Add a reset step at the end
-    steps.push({
-      type: "node",
-      action: "reset",
-      data: {},
-    })
-
     return steps
   }
 
-  // Apply a single animation step
   const applyAnimationStep = (step: AnimationStep) => {
-    if (step.action === "reset") {
-      resetVisualization()
-      return
+    const isMatchingEdge = (e: Edge, from: number, to: number) =>
+      (e.from === from && e.to === to) || (e.from === to && e.to === from)
+
+    const updateEdgeState = (from: number, to: number, color: string) => {
+      setEdges((prev) =>
+        prev.map((e) =>
+          isMatchingEdge(e, from, to)
+            ? { ...e, color, animating: true }
+            : { ...e, animating: false }
+        )
+      )
+    }
+
+    const updateNodeState = (ids: number[], color: string) => {
+      setNodes((prev) =>
+        prev.map((n) =>
+          ids.includes(n.id)
+            ? { ...n, color, animating: true }
+            : { ...n, animating: false }
+        )
+      )
     }
 
     if (step.type === "node" && step.action === "color") {
       const { id, color } = step.data
-      setNodes((prev) =>
-        prev.map((n) => {
-          if (n.id === id) {
-            return { ...n, color, animating: true }
-          }
-          // Remove animating flag from other nodes
-          if (n.animating) {
-            return { ...n, animating: false }
-          }
-          return n
-        }),
-      )
+      updateNodeState([id], color)
     }
 
     if (step.type === "edge" && step.action === "traverse") {
       const { from, to, color } = step.data
-      setEdges((prev) =>
-        prev.map((e) => {
-          if ((e.from === from && e.to === to) || (e.from === to && e.to === from)) {
-            return { ...e, color, animating: true }
-          }
-          // Remove animating flag from other edges
-          if (e.animating) {
-            return { ...e, animating: false }
-          }
-          return e
-        }),
-      )
+      updateEdgeState(from, to, color)
     }
 
     if (step.type === "traversal" && step.action === "traverse") {
       const { from, to, color } = step.data
 
-      // Update the edge
-      setEdges((prev) =>
-        prev.map((e) => {
-          if ((e.from === from && e.to === to) || (e.from === to && e.to === from)) {
-            return { ...e, color, animating: true }
-          }
-          // Remove animating flag from other edges
-          if (e.animating) {
-            return { ...e, animating: false }
-          }
-          return e
-        }),
-      )
+      const edgeExists = edges.some((e) => isMatchingEdge(e, from, to))
+      if (!edgeExists) return // ⛔ no edge — do nothing
 
-      // Update both nodes
-      setNodes((prev) =>
-        prev.map((n) => {
-          if (n.id === from || n.id === to) {
-            return { ...n, color, animating: true }
-          }
-          // Remove animating flag from other nodes
-          if (n.animating) {
-            return { ...n, animating: false }
-          }
-          return n
-        }),
-      )
+      updateEdgeState(from, to, color)
+      updateNodeState([from, to], color)
     }
   }
+ 
 
-  // Run the animation
-  const runAnimation = () => {
-    if (currentStep >= animationQueue.length) {
-      setIsAnimating(false)
-      return
-    }
-
-    applyAnimationStep(animationQueue[currentStep])
-    setCurrentStep((prev) => prev + 1)
-
-    animationRef.current = setTimeout(() => {
-      runAnimation()
-    }, animationSpeed)
-  }
-
-  // Start or resume animation
-  const startAnimation = () => {
-    if (currentStep >= animationQueue.length) {
-      resetVisualization()
-    }
-
+  const runAnimation = async () => {
     setIsAnimating(true)
+
+    for (let step = currentStep; step < animationQueue.length; step++) {
+      applyAnimationStep(animationQueue[step])
+      setCurrentStep(step + 1)
+
+      await new Promise((resolve) => setTimeout(resolve, animationSpeed))
+    }
+
+    setIsAnimating(false)
+  }
+
+  const startAnimation = () => {
+    if (isAnimating || currentStep >= animationQueue.length) return
     runAnimation()
   }
 
-  // Pause animation
   const pauseAnimation = () => {
     setIsAnimating(false)
     if (animationRef.current) {
@@ -214,7 +169,6 @@ export default function GraphVisualizer() {
     }
   }
 
-  // Step forward one animation step
   const stepForward = () => {
     if (currentStep < animationQueue.length) {
       pauseAnimation()
@@ -223,7 +177,6 @@ export default function GraphVisualizer() {
     }
   }
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (animationRef.current) {
@@ -232,7 +185,6 @@ export default function GraphVisualizer() {
     }
   }, [])
 
-  // Stop animation when we reach the end
   useEffect(() => {
     if (currentStep >= animationQueue.length && isAnimating) {
       setIsAnimating(false)
@@ -277,7 +229,6 @@ export default function GraphVisualizer() {
       setTotalSteps(steps.length)
       setOutput(result)
 
-      // Auto-start animation
       setCurrentStep(0)
       setIsAnimating(true)
       setTimeout(() => {
@@ -288,6 +239,7 @@ export default function GraphVisualizer() {
       setOutput("Error executing Python code: " + String(err))
     }
   }
+
 
   return (
     <div className="flex flex-col h-screen bg-background">
