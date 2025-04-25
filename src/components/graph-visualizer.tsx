@@ -33,7 +33,7 @@ type Edge = {
 }
 
 type AnimationStep = {
-  type: "node" | "edge"
+  type: "node" | "edge" | "traversal"
   action: "color" | "traverse" | "reset"
   data: any
 }
@@ -89,23 +89,11 @@ export default function GraphVisualizer() {
         const to = Number.parseInt(parts[3])
         const color = parts[4] || "blue"
 
+        // Create a single step for the traversal that includes both the edge and nodes
         steps.push({
-          type: "edge",
+          type: "traversal",
           action: "traverse",
           data: { from, to, color },
-        })
-
-        // Also color the nodes
-        steps.push({
-          type: "node",
-          action: "color",
-          data: { id: from, color },
-        })
-
-        steps.push({
-          type: "node",
-          action: "color",
-          data: { id: to, color },
         })
       }
     }
@@ -155,6 +143,38 @@ export default function GraphVisualizer() {
             return { ...e, animating: false }
           }
           return e
+        }),
+      )
+    }
+
+    if (step.type === "traversal" && step.action === "traverse") {
+      const { from, to, color } = step.data
+
+      // Update the edge
+      setEdges((prev) =>
+        prev.map((e) => {
+          if ((e.from === from && e.to === to) || (e.from === to && e.to === from)) {
+            return { ...e, color, animating: true }
+          }
+          // Remove animating flag from other edges
+          if (e.animating) {
+            return { ...e, animating: false }
+          }
+          return e
+        }),
+      )
+
+      // Update both nodes
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (n.id === from || n.id === to) {
+            return { ...n, color, animating: true }
+          }
+          // Remove animating flag from other nodes
+          if (n.animating) {
+            return { ...n, animating: false }
+          }
+          return n
         }),
       )
     }
