@@ -1,35 +1,36 @@
 const algorithmTemplates: Record<string, string> = {
-  bfs: `// BFS Algorithm
-function bfs(graph, startNode) {
-  const visited = new Set();
-  const queue = [startNode];
-  visited.add(startNode);
-  
-  while (queue.length > 0) {
-    const node = queue.shift();
-    console.log(node); // Process node
-    
-    for (const neighbor of graph[node]) {
-      if (!visited.has(neighbor)) {
-        visited.add(neighbor);
-        queue.push(neighbor);
-      }
-    }
-  }
-}
+  bfs: `# BFS Algorithm
+def main(adj):
+    index = 0
+    start_node = 0
+    queue = [(start_node, -1)]
+    visited = set()
+    visited.add(start_node)
+
+    while index<len(queue):
+        
+        node = queue[index][0];
+        
+        traverse(queue[index][1], queue[index][0])
+        colour(node)
+        for child in adj[node]:
+            if child not in visited:
+                queue.append((child, node))
+                visited.add(node)
+        index += 1
 `,
 
-  dfs: `// DFS Algorithm
-function dfs(graph, startNode, visited = new Set()) {
-  visited.add(startNode);
-  console.log(startNode); // Process node
-  
-  for (const neighbor of graph[startNode]) {
-    if (!visited.has(neighbor)) {
-      dfs(graph, neighbor, visited);
-    }
-  }
-}
+  dfs: `# DFS Algorithm
+def main(adj):
+    visited = set()
+    def dfs(node, parent):
+        visited.add(node)
+        traverse(parent, node)
+        colour(node)
+        for child in adj[node]:
+            if child != parent and child not in visited:
+                dfs(child, node)
+    dfs(0, -1)
 `,
 
   dijkstra: `// Dijkstra's Algorithm
@@ -65,7 +66,61 @@ function dijkstra(graph, startNode) {
   
   return { distances, previous };
 }
-`,
+`, 
+ order_traversal: `
+  def main(adj):
+    # both preorder and post order work on any tree.
+    def preorder_traversal(node, parent):
+        colour(node)
+        for child in adj[node]:
+            if child != parent:
+                traverse(node, child)
+                preorder_traversal(child, node)
+        if (node):
+            traverse(node, parent)
+
+    def postorder_traversal(node, parent):
+        for child in adj[node]:
+            if child != parent:
+                traverse(node, child)
+                postorder_traversal(child, node)
+        colour(node)
+        if (node):
+            traverse(node, parent)
+    
+    
+    # for this one i think it should be binary tree
+    # also ill clean it up later probably im sure theres a better way
+
+    def inorder_traversal(node, parent):
+        child_count = 0;
+        if len(adj[node]) == 1:
+            colour(node)
+            if (node):
+                traverse(node, parent)
+            return
+        lc = adj[node][0] if parent == adj[node][1] else adj[node][1]
+        traverse(node, child)
+        inorder_traversal(lc, node)
+        colour(node)
+        for child in adj[node]:
+            if child != lc and child != parent:
+                traverse(node, child)
+                inorder_traversal(child, node)
+
+        if (node):
+            traverse(node, parent)
+
+    # preorder_traversal(0, -1)
+    # postorder_traversal(0, -1)
+    # inorder_traversal(0, -1)
+  `,
+
+
+
+
+
+
 }
 
 export default algorithmTemplates
