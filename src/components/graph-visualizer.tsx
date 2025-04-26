@@ -219,7 +219,15 @@ export default function GraphVisualizer() {
     try {
       const boilerplate = library
       const graph = graphAsArray()
-      const code_input = boilerplate + code + `\ngraph = ${JSON.stringify(graph, null, 2)}` + "\nmain(graph)"
+
+      const adj= `{
+        ${Object.entries(graph)
+          .map(([k, v]) => `${k}: [${v.join(", ")}]`)
+          .join(",\n  ")}
+      }`
+      const code_input = boilerplate + code + `\ngraph = ${adj}` + "\nmain(graph)"
+      // console.log(code_input)
+      // const code_input = boilerplate + code + `\ngraph = ${JSON.stringify(graph, null, 2)}` + "\nmain(graph)"
       const result = await runPython(code_input)
 
       const commands = result.split(/\r?\n/)
