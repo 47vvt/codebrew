@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-import { Play, Pause, SkipForward, RotateCcw, HelpCircle, Info, Save, Upload } from "lucide-react"
+import { Play, Pause, SkipForward, RotateCcw, HelpCircle, Info, Save, Upload, Network, Moon, Sun } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +17,8 @@ import AlgorithmSelector from "./algorithm-selector"
 import algorithmTemplates from "@/lib/algorithms"
 import { runPython } from "./utils/pyodide-runner"
 import library from "@/lib/library"
+import { cn } from "@/lib/utils"
+import { useTheme } from "./theme-provider"
 
 type Node = {
   id: number
@@ -43,8 +45,8 @@ type GraphCommand = {
 }
 
 export default function GraphVisualizer() {
-  const [selectedAlgorithm, setSelectedAlgorithm] = useState("bfs")
-  const [code, setCode] = useState(algorithmTemplates["bfs"] || "")
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState("custom")
+  const [code, setCode] = useState(algorithmTemplates["custom"] || "")
   const [output, setOutput] = useState("")
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
@@ -56,6 +58,10 @@ export default function GraphVisualizer() {
   const animationRef = useRef<NodeJS.Timeout | null>(null)
   const [showLegend, setShowLegend] = useState(false)
   const [stepDescription, setStepDescription] = useState<string>("")
+  const [hasError, setHasError] = useState(false)
+  const [activeTab, setActiveTab] = useState("code")
+
+  const { theme, setTheme } = useTheme()
 
   // Reset all node and edge colors
   const resetVisualization = () => {
@@ -226,6 +232,7 @@ export default function GraphVisualizer() {
     setCode(algorithmTemplates[algorithm] || "# Write your algorithm here")
     setCommands([])
     setOutput("")
+    setHasError(false)
   }
 
   // Create weighted adjacency list
@@ -253,6 +260,7 @@ export default function GraphVisualizer() {
   const runAlgorithm = async () => {
     resetVisualization()
     setCommands([])
+    setHasError(false)
 
     try {
       const boilerplate = library
@@ -273,6 +281,11 @@ export default function GraphVisualizer() {
       const code_input = boilerplate + code + `\ngraph = ${formattedGraph}` + "\nmain(graph)"
       const result = await runPython(code_input)
 
+      if (result.includes("Error")) {
+        setHasError(true)
+        setActiveTab("output")
+      }
+
       const extractedCommands = extractCommands(result)
 
       setCommands(extractedCommands)
@@ -290,7 +303,9 @@ export default function GraphVisualizer() {
       }
     } catch (err) {
       console.error(err)
-      setOutput("Error executing Python code: " + String(err))
+      setOutput("Error executing Python code:\n" + String(err))
+      setHasError(true)
+      setActiveTab("output")
     }
   }
 
@@ -332,6 +347,8 @@ export default function GraphVisualizer() {
       } catch (err) {
         console.error("Error loading graph:", err)
         setOutput("Error loading graph: " + String(err))
+        setHasError(true)
+        setActiveTab("output")
       }
     }
     reader.readAsText(file)
@@ -342,10 +359,26 @@ export default function GraphVisualizer() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="border-b bg-background p-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Graph Algorithm Visualizer</h1>
+      <header className="border-b bg-background p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Network className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Graph Sandbox</h1>
+        </div>
 
         <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{theme === "dark" ? "Light Mode" : "Dark Mode"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -392,16 +425,16 @@ export default function GraphVisualizer() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 border-r p-4 flex flex-col">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-medium">Graph Visualization</h2>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-bold text-primary">Graph Canvas</h2>
             <div className="flex items-center gap-2">
               {showLegend && (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-3 text-sm bg-muted/50 p-2 rounded-md">
                   <div className="flex items-center">
                     <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
                     <span>Visited</span>
                   </div>
-                  <div className="flex items-center ml-2">
+                  <div className="flex items-center">
                     <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
                     <span>Current</span>
                   </div>
@@ -410,11 +443,11 @@ export default function GraphVisualizer() {
             </div>
           </div>
 
-          <div className="relative flex-1 border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900">
+          <div className="relative flex-1 border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900 shadow-md">
             <GraphCanvas nodes={nodes} edges={edges} setNodes={setNodes} setEdges={setEdges} />
 
             {commands.length > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm p-3 border-t">
+              <div className="absolute bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm p-3 border-t">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Button size="icon" variant="outline" onClick={isAnimating ? pauseAnimation : startAnimation}>
@@ -445,14 +478,18 @@ export default function GraphVisualizer() {
                     />
                   </div>
 
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="bg-primary/10">
                     Step {Math.min(currentStep, commands.length)} of {totalSteps}
                   </Badge>
                 </div>
 
-                {stepDescription && <div className="text-sm mb-2 bg-muted/50 p-1 rounded">{stepDescription}</div>}
+                {stepDescription && (
+                  <div className="text-sm mb-2 bg-muted/50 p-2 rounded-md border border-border/50">
+                    {stepDescription}
+                  </div>
+                )}
 
-                <div className="w-full bg-secondary h-1 rounded-full overflow-hidden">
+                <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
                   <div
                     className="bg-primary h-full transition-all duration-300"
                     style={{ width: `${(Math.min(currentStep, commands.length) / totalSteps) * 100}%` }}
@@ -467,45 +504,62 @@ export default function GraphVisualizer() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
                   <Info className="h-4 w-4" />
-                  <span>Graph as Array</span>
+                  <span>View Graph Structure</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <div className="p-4">
                   <h3 className="text-sm font-medium mb-2">Weighted Adjacency List</h3>
-                  <GraphArray graph={graphAsWeightedAdjacencyList()} />
+                  <div className="max-h-[300px] overflow-auto">
+                    <GraphArray graph={graphAsWeightedAdjacencyList()} />
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Algorithm:</span>
+              <span className="text-sm font-medium">Templates:</span>
               <AlgorithmSelector selectedAlgorithm={selectedAlgorithm} onAlgorithmChange={handleAlgorithmChange} />
             </div>
           </div>
         </div>
 
         <div className="w-1/2 flex flex-col">
-          <Tabs defaultValue="code" className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center px-4 pt-3">
+          <Tabs defaultValue="code" value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+            <div className="flex justify-between items-center px-4 pt-4 pb-2">
               <TabsList className="justify-start">
                 <TabsTrigger value="code">Code Editor</TabsTrigger>
-                <TabsTrigger value="output">Output</TabsTrigger>
+                <TabsTrigger
+                  value="output"
+                  className={cn(
+                    hasError && "relative",
+                    hasError &&
+                      "after:absolute after:top-0 after:right-0 after:w-2 after:h-2 after:bg-red-500 after:rounded-full",
+                  )}
+                >
+                  Output {hasError && <span className="ml-1 text-red-500">(!)</span>}
+                </TabsTrigger>
               </TabsList>
 
-              <Button onClick={runAlgorithm} className="gap-2" disabled={nodes.length === 0}>
+              <Button
+                onClick={runAlgorithm}
+                className="gap-2 bg-primary hover:bg-primary/90"
+                disabled={nodes.length === 0}
+              >
                 <Play className="h-4 w-4" />
                 Run Algorithm
               </Button>
             </div>
 
             <TabsContent value="code" className="flex-1 p-0 m-0 flex flex-col">
-              <CodeEditor code={code} onChange={setCode} />
+              <CodeEditor code={code} onChange={setCode} theme={theme} />
             </TabsContent>
 
-            <TabsContent value="output" className="flex-1 p-4">
-              <div className="bg-muted p-4 rounded-md h-full overflow-auto">
-                <pre className="text-sm font-mono">
+            <TabsContent value="output" className="flex-1 p-4 m-0 overflow-hidden">
+              <div
+                className={cn("bg-muted p-4 rounded-md h-full overflow-auto", hasError && "border-2 border-red-500/50")}
+              >
+                <pre className={cn("text-sm font-mono whitespace-pre-wrap", hasError && "text-red-500")}>
                   {output || "Output will appear here when you run the algorithm"}
                 </pre>
               </div>

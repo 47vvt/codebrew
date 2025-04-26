@@ -6,6 +6,7 @@ import { useRef, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, MousePointer, LinkIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useTheme } from "./theme-provider"
 
 type Node = {
   id: number
@@ -39,6 +40,7 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
   const [selectedNode, setSelectedNode] = useState<number | null>(null)
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [draggingNode, setDraggingNode] = useState<number | null>(null)
+  const { theme } = useTheme()
 
   // Calculate distance between two points (for edge weight)
   const calculateDistance = (x1: number, y1: number, x2: number, y2: number): number => {
@@ -280,7 +282,7 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
 
           if (!source || !target) return null
 
-          const edgeColor = edge.color || "black"
+          const edgeColor = edge.color || (theme === "dark" ? "white" : "black")
           const strokeWidth = edge.animating ? 3 : 2
           const strokeDasharray = edge.animating ? "5,5" : "none"
 
@@ -324,12 +326,16 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
                   y={labelY}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="black"
+                  fill={theme === "dark" ? "white" : "black"}
                   fontSize="12"
                   fontWeight="bold"
-                  className="pointer-events-none bg-white px-1"
+                  className="pointer-events-none"
                 >
-                  <tspan className="bg-white px-1 py-0.5 rounded">{edge.weight}</tspan>
+                  <tspan
+                    className={theme === "dark" ? "bg-slate-800 px-1 py-0.5 rounded" : "bg-white px-1 py-0.5 rounded"}
+                  >
+                    {edge.weight}
+                  </tspan>
                 </text>
               </svg>
             </div>
@@ -373,12 +379,18 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
                     y={midY}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fill="gray"
+                    fill={theme === "dark" ? "white" : "gray"}
                     fontSize="12"
                     fontWeight="bold"
                     className="pointer-events-none"
                   >
-                    <tspan className="bg-white/80 px-1 py-0.5 rounded">{weight}</tspan>
+                    <tspan
+                      className={
+                        theme === "dark" ? "bg-slate-800/80 px-1 py-0.5 rounded" : "bg-white/80 px-1 py-0.5 rounded"
+                      }
+                    >
+                      {weight}
+                    </tspan>
                   </text>
                 </svg>
               </div>
@@ -401,7 +413,7 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
             if (isSelected) return "#3b82f6" // Blue for selected
             if (isHovered && mode === "addEdge") return "#10b981" // Green for potential edge
             if (isHovered && mode === "delete") return "#ef4444" // Red for delete
-            return "black"
+            return theme === "dark" ? "white" : "black"
           })()
 
           return (
@@ -437,7 +449,7 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
             {mode === "addNode" ? (
               <p>Click anywhere to add a node</p>
             ) : (
-              <p>Select "Add Node" to start building your graph</p>
+              <p>Select "+" and click anywhere on the canvas.</p>
             )}
           </div>
         )}

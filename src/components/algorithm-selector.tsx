@@ -16,7 +16,8 @@ export default function AlgorithmSelector({ selectedAlgorithm, onAlgorithmChange
       <SelectContent>
         <SelectItem value="custom">Empty</SelectItem>
         <SelectItem value="bfs">Breadth First Search</SelectItem>
-        <SelectItem value="dfs">Depth First Search</SelectItem>
+        <SelectItem value="dfs">Depth First Search (Recursive)</SelectItem>
+        <SelectItem value="dfs2">Depth First Search (Iterative)</SelectItem>
         <SelectItem value="dijkstra">Dijkstra's Algorithm</SelectItem>
         <SelectItem value="prim">Prim's Algorithm</SelectItem>
         <SelectItem value="bellman_ford">Bellman-Ford Algorithm</SelectItem>
