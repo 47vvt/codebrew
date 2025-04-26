@@ -113,13 +113,14 @@ export default function GraphVisualizer() {
 
     const updateNodeState = (ids: number[], color: string) => {
       setNodes((prev) =>
-        prev.map((n) =>
-          ids.includes(n.id)
-            ? { ...n, color, animating: true }
-            : { ...n, animating: false }
-        )
+        prev.map((n) => {
+          if (!ids.includes(n.id)) return { ...n, animating: false }
+          if (n.color === "red" && color === "blue") return n // ❌ skip update
+          return { ...n, color, animating: true }
+        })
       )
     }
+    
 
     if (step.type === "node" && step.action === "color") {
       const { id, color } = step.data
