@@ -1,10 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-import { Menu, Play, Pause, SkipForward, RotateCcw, HelpCircle, Info } from "lucide-react"
+import { Play, Pause, SkipForward, RotateCcw, HelpCircle, Info, Save, Upload } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
@@ -221,7 +223,7 @@ export default function GraphVisualizer() {
   const handleAlgorithmChange = (algorithm: string) => {
     resetVisualization()
     setSelectedAlgorithm(algorithm)
-    setCode(algorithmTemplates[algorithm] || "# Algorithm not found")
+    setCode(algorithmTemplates[algorithm] || "# Write your algorithm here")
     setCommands([])
     setOutput("")
   }
@@ -292,17 +294,87 @@ export default function GraphVisualizer() {
     }
   }
 
+  // Save graph to JSON
+  const saveGraph = () => {
+    const graphData = {
+      nodes,
+      edges,
+    }
+
+    const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "graph.json"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  // Load graph from JSON
+  const loadGraph = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        const graphData = JSON.parse(content)
+
+        if (graphData.nodes && graphData.edges) {
+          setNodes(graphData.nodes)
+          setEdges(graphData.edges)
+          resetVisualization()
+        }
+      } catch (err) {
+        console.error("Error loading graph:", err)
+        setOutput("Error loading graph: " + String(err))
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset the input value so the same file can be loaded again
+    event.target.value = ""
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="border-b bg-background p-3 flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" className="mr-2">
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">Graph Algorithm Visualizer</h1>
-        </div>
+        <h1 className="text-xl font-bold">Graph Algorithm Visualizer</h1>
+
         <div className="flex items-center gap-2">
-          <AlgorithmSelector selectedAlgorithm={selectedAlgorithm} onAlgorithmChange={handleAlgorithmChange} />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={saveGraph}>
+                  <Save className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Save Graph</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <input type="file" id="load-graph" className="hidden" accept=".json" onChange={loadGraph} />
+                  <Button variant="outline" size="icon" onClick={() => document.getElementById("load-graph")?.click()}>
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Load Graph</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -390,7 +462,7 @@ export default function GraphVisualizer() {
             )}
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 flex justify-between items-center">
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -405,6 +477,11 @@ export default function GraphVisualizer() {
                 </div>
               </PopoverContent>
             </Popover>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Algorithm:</span>
+              <AlgorithmSelector selectedAlgorithm={selectedAlgorithm} onAlgorithmChange={handleAlgorithmChange} />
+            </div>
           </div>
         </div>
 
