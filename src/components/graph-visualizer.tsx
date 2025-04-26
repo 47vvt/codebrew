@@ -28,14 +28,16 @@ type Node = {
 type Edge = {
   from: number
   to: number
+  weight: number
   color?: string
   animating?: boolean
 }
 
-type AnimationStep = {
-  type: "node" | "edge" | "traversal"
-  action: "color" | "traverse" | "reset"
-  data: any
+// A command from the Python code
+type GraphCommand = {
+  type: "colour" | "traverse"
+  params: string[]
+  description?: string
 }
 
 export default function GraphVisualizer() {
@@ -46,122 +48,131 @@ export default function GraphVisualizer() {
   const [edges, setEdges] = useState<Edge[]>([])
   const [animationSpeed, setAnimationSpeed] = useState(500)
   const [isAnimating, setIsAnimating] = useState(false)
-  const [animationQueue, setAnimationQueue] = useState<AnimationStep[]>([])
+  const [commands, setCommands] = useState<GraphCommand[]>([])
   const [currentStep, setCurrentStep] = useState(0)
   const [totalSteps, setTotalSteps] = useState(0)
   const animationRef = useRef<NodeJS.Timeout | null>(null)
   const [showLegend, setShowLegend] = useState(false)
+  const [stepDescription, setStepDescription] = useState<string>("")
 
+  // Reset all node and edge colors
   const resetVisualization = () => {
     setNodes((prev) => prev.map((node) => ({ ...node, color: undefined, animating: false })))
     setEdges((prev) => prev.map((edge) => ({ ...edge, color: undefined, animating: false })))
     setCurrentStep(0)
     setIsAnimating(false)
+    setStepDescription("")
     if (animationRef.current) {
       clearTimeout(animationRef.current)
       animationRef.current = null
     }
   }
 
-  const processGraphCommands = (commands: string[]) => {
-    const steps: AnimationStep[] = []
+  // Extract commands from Python output
+  const extractCommands = (output: string): GraphCommand[] => {
+    const lines = output.split(/\r?\n/)
+    const commands: GraphCommand[] = []
+    let lastDescription = ""
 
-    for (const cmd of commands) {
-      if (!cmd.startsWith("__GRAPH__")) continue
+    for (const line of lines) {
+      if (line.startsWith("__GRAPH__")) {
+        const parts = line.split(" ")
+        const commandType = parts[1] as "colour" | "traverse"
 
-      const parts = cmd.split(" ")
-      const action = parts[1]
-
-      if (action === "colour" && parts[2]) {
-        const targetId = Number.parseInt(parts[2])
-        const color = parts[3] || "red"
-        steps.push({
-          type: "node",
-          action: "color",
-          data: { id: targetId, color },
-        })
-      }
-
-      if (action === "traverse" && parts[2] && parts[3]) {
-        const from = Number.parseInt(parts[2])
-        const to = Number.parseInt(parts[3])
-        const color = parts[4] || "blue"
-        steps.push({
-          type: "traversal",
-          action: "traverse",
-          data: { from, to, color },
-        })
+        if (commandType === "colour" || commandType === "traverse") {
+          commands.push({
+            type: commandType,
+            params: parts.slice(2),
+            description: lastDescription,
+          })
+          lastDescription = "" // Reset description after using it
+        }
+      } else if (line.trim()) {
+        // Store non-graph lines as descriptions for the next command
+        lastDescription = line.trim()
       }
     }
 
-    return steps
+    return commands
   }
 
-  const applyAnimationStep = (step: AnimationStep) => {
-    const isMatchingEdge = (e: Edge, from: number, to: number) =>
-      (e.from === from && e.to === to) || (e.from === to && e.to === from)
+  // Apply a single command
+  const applyCommand = (commandIndex: number) => {
+    if (commandIndex >= commands.length) return
 
-    const updateEdgeState = (from: number, to: number, color: string) => {
-      setEdges((prev) =>
-        prev.map((e) =>
-          isMatchingEdge(e, from, to)
-            ? { ...e, color, animating: true }
-            : { ...e, animating: false }
-        )
-      )
-    }
+    const command = commands[commandIndex]
 
-    const updateNodeState = (ids: number[], color: string) => {
+    if (command.type === "colour") {
+      const nodeId = Number.parseInt(command.params[0])
+      const color = command.params[1] || "red"
+
       setNodes((prev) =>
-        prev.map((n) => {
-          if (!ids.includes(n.id)) return { ...n, animating: false }
-          if (n.color === "red" && color === "blue") return n // ❌ skip update
-          return { ...n, color, animating: true }
-        })
+        prev.map((node) => {
+          if (node.id === nodeId) {
+            return { ...node, color, animating: true }
+          }
+          // Keep other nodes as they are but turn off animation
+          return { ...node, animating: false }
+        }),
+      )
+    } else if (command.type === "traverse") {
+      const fromId = Number.parseInt(command.params[0])
+      const toId = Number.parseInt(command.params[1])
+      const color = command.params[2] || "blue"
+
+      // Update the edge
+      setEdges((prev) =>
+        prev.map((edge) => {
+          if ((edge.from === fromId && edge.to === toId) || (edge.from === toId && edge.to === fromId)) {
+            return { ...edge, color, animating: true }
+          }
+          // Keep other edges as they are but turn off animation
+          return { ...edge, animating: false }
+        }),
+      )
+
+      // Update both nodes, but don't change red nodes to blue
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.id === fromId || node.id === toId) {
+            // Only update color if the node isn't already red
+            if (node.color === "red") {
+              return { ...node, animating: true }
+            }
+            return { ...node, color, animating: true }
+          }
+          // Keep other nodes as they are but turn off animation
+          return { ...node, animating: false }
+        }),
       )
     }
-    
 
-    if (step.type === "node" && step.action === "color") {
-      const { id, color } = step.data
-      updateNodeState([id], color)
-    }
-
-    if (step.type === "edge" && step.action === "traverse") {
-      const { from, to, color } = step.data
-      updateEdgeState(from, to, color)
-    }
-
-    if (step.type === "traversal" && step.action === "traverse") {
-      const { from, to, color } = step.data
-
-      const edgeExists = edges.some((e) => isMatchingEdge(e, from, to))
-      if (!edgeExists) return // ⛔ no edge — do nothing
-
-      updateEdgeState(from, to, color)
-      updateNodeState([from, to], color)
-    }
-  }
- 
-
-  const runAnimation = async () => {
-    setIsAnimating(true)
-
-    for (let step = currentStep; step < animationQueue.length; step++) {
-      applyAnimationStep(animationQueue[step])
-      setCurrentStep(step + 1)
-
-      await new Promise((resolve) => setTimeout(resolve, animationSpeed))
-    }
-
-    setIsAnimating(false)
+    // Update step description
+    setStepDescription(command.description || "")
   }
 
+  // Manual step forward
+  const stepForward = () => {
+    if (currentStep < commands.length) {
+      // Apply the current command
+      applyCommand(currentStep)
+
+      // Move to the next step
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  // Start or resume animation
   const startAnimation = () => {
-    if (isAnimating || currentStep >= animationQueue.length) return
-    runAnimation()
+    // If we're at the end, reset
+    if (currentStep >= commands.length) {
+      resetVisualization()
+    }
+
+    setIsAnimating(true)
   }
 
+  // Pause animation
   const pauseAnimation = () => {
     setIsAnimating(false)
     if (animationRef.current) {
@@ -170,14 +181,35 @@ export default function GraphVisualizer() {
     }
   }
 
-  const stepForward = () => {
-    if (currentStep < animationQueue.length) {
-      pauseAnimation()
-      applyAnimationStep(animationQueue[currentStep])
-      setCurrentStep((prev) => prev + 1)
-    }
-  }
+  // Animation loop
+  useEffect(() => {
+    // If not animating, do nothing
+    if (!isAnimating) return
 
+    // If we're at the end, stop animating
+    if (currentStep >= commands.length) {
+      setIsAnimating(false)
+      return
+    }
+
+    // Apply the current command
+    applyCommand(currentStep)
+
+    // Schedule the next step
+    const timer = setTimeout(() => {
+      setCurrentStep((prev) => prev + 1)
+    }, animationSpeed)
+
+    // Store the timer reference
+    animationRef.current = timer
+
+    // Cleanup function
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [isAnimating, currentStep, commands, animationSpeed])
+
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (animationRef.current) {
@@ -186,69 +218,79 @@ export default function GraphVisualizer() {
     }
   }, [])
 
-  useEffect(() => {
-    if (currentStep >= animationQueue.length && isAnimating) {
-      setIsAnimating(false)
-    }
-  }, [currentStep, animationQueue.length, isAnimating])
-
   const handleAlgorithmChange = (algorithm: string) => {
     resetVisualization()
     setSelectedAlgorithm(algorithm)
     setCode(algorithmTemplates[algorithm] || "# Algorithm not found")
-    setAnimationQueue([])
+    setCommands([])
     setOutput("")
   }
 
-  const graphAsArray = () => {
-    const graph: Record<number, number[]> = {}
-    nodes.forEach((node) => (graph[node.id] = []))
-    edges.forEach((edge) => {
-      if (!graph[edge.from]) graph[edge.from] = []
-      if (!graph[edge.to]) graph[edge.to] = []
+  // Create weighted adjacency list
+  const graphAsWeightedAdjacencyList = () => {
+    const graph: Record<number, Record<number, number>> = {}
 
-      graph[edge.from].push(edge.to)
-      graph[edge.to].push(edge.from)
+    // Initialize empty adjacency lists for all nodes
+    nodes.forEach((node) => {
+      graph[node.id] = {}
     })
+
+    // Add edges with weights
+    edges.forEach((edge) => {
+      if (!graph[edge.from]) graph[edge.from] = {}
+      if (!graph[edge.to]) graph[edge.to] = {}
+
+      // Add bidirectional edges with weights
+      graph[edge.from][edge.to] = edge.weight
+      graph[edge.to][edge.from] = edge.weight
+    })
+
     return graph
   }
 
   const runAlgorithm = async () => {
     resetVisualization()
-    setAnimationQueue([])
+    setCommands([])
 
     try {
       const boilerplate = library
-      const graph = graphAsArray()
+      const graph = graphAsWeightedAdjacencyList()
 
-      const adj= `{
+      // Format the weighted adjacency list for Python
+      const formattedGraph = `{
         ${Object.entries(graph)
-          .map(([k, v]) => `${k}: [${v.join(", ")}]`)
+          .map(([nodeId, neighbors]) => {
+            const neighborEntries = Object.entries(neighbors)
+              .map(([neighborId, weight]) => `${neighborId}: ${weight}`)
+              .join(", ")
+            return `${nodeId}: {${neighborEntries}}`
+          })
           .join(",\n  ")}
       }`
-      const code_input = boilerplate + code + `\ngraph = ${adj}` + "\nmain(graph)"
-      // console.log(code_input)
-      // const code_input = boilerplate + code + `\ngraph = ${JSON.stringify(graph, null, 2)}` + "\nmain(graph)"
+
+      const code_input = boilerplate + code + `\ngraph = ${formattedGraph}` + "\nmain(graph)"
       const result = await runPython(code_input)
 
-      const commands = result.split(/\r?\n/)
-      const steps = processGraphCommands(commands)
+      const extractedCommands = extractCommands(result)
 
-      setAnimationQueue(steps)
-      setTotalSteps(steps.length)
+      setCommands(extractedCommands)
+      setTotalSteps(extractedCommands.length)
       setOutput(result)
 
-      setCurrentStep(0)
-      setIsAnimating(true)
-      setTimeout(() => {
-        runAnimation()
-      }, 500)
+      // Auto-start animation if there are commands
+      if (extractedCommands.length > 0) {
+        setCurrentStep(0)
+
+        // Start animation after a short delay
+        setTimeout(() => {
+          setIsAnimating(true)
+        }, 100)
+      }
     } catch (err) {
       console.error(err)
       setOutput("Error executing Python code: " + String(err))
     }
   }
-
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -299,7 +341,7 @@ export default function GraphVisualizer() {
           <div className="relative flex-1 border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900">
             <GraphCanvas nodes={nodes} edges={edges} setNodes={setNodes} setEdges={setEdges} />
 
-            {animationQueue.length > 0 && (
+            {commands.length > 0 && (
               <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm p-3 border-t">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -310,7 +352,7 @@ export default function GraphVisualizer() {
                       size="icon"
                       variant="outline"
                       onClick={stepForward}
-                      disabled={currentStep >= animationQueue.length}
+                      disabled={currentStep >= commands.length}
                     >
                       <SkipForward className="h-4 w-4" />
                     </Button>
@@ -332,14 +374,16 @@ export default function GraphVisualizer() {
                   </div>
 
                   <Badge variant="outline">
-                    Step {currentStep} of {totalSteps}
+                    Step {Math.min(currentStep, commands.length)} of {totalSteps}
                   </Badge>
                 </div>
+
+                {stepDescription && <div className="text-sm mb-2 bg-muted/50 p-1 rounded">{stepDescription}</div>}
 
                 <div className="w-full bg-secondary h-1 rounded-full overflow-hidden">
                   <div
                     className="bg-primary h-full transition-all duration-300"
-                    style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                    style={{ width: `${(Math.min(currentStep, commands.length) / totalSteps) * 100}%` }}
                   ></div>
                 </div>
               </div>
@@ -356,8 +400,8 @@ export default function GraphVisualizer() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <div className="p-4">
-                  <h3 className="text-sm font-medium mb-2">Adjacency List</h3>
-                  <GraphArray graph={graphAsArray()} />
+                  <h3 className="text-sm font-medium mb-2">Weighted Adjacency List</h3>
+                  <GraphArray graph={graphAsWeightedAdjacencyList()} />
                 </div>
               </PopoverContent>
             </Popover>

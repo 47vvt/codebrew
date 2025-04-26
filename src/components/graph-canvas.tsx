@@ -19,6 +19,7 @@ type Node = {
 type Edge = {
   from: number
   to: number
+  weight: number
   color?: string
   animating?: boolean
 }
@@ -39,6 +40,13 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
   const [hoveredNode, setHoveredNode] = useState<number | null>(null)
   const [draggingNode, setDraggingNode] = useState<number | null>(null)
 
+  // Calculate distance between two points (for edge weight)
+  const calculateDistance = (x1: number, y1: number, x2: number, y2: number): number => {
+    const dx = x2 - x1
+    const dy = y2 - y1
+    return Math.round(Math.sqrt(dx * dx + dy * dy))
+  }
+
   // Handle container click for adding nodes
   const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (mode !== "addNode") return
@@ -56,7 +64,6 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
       return [...prev, { id: newId, x, y }]
     })
   }
- 
 
   // Handle node click
   const handleNodeClick = (id: number, event: React.MouseEvent) => {
@@ -75,7 +82,17 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
         )
 
         if (!edgeExists) {
-          setEdges((prev) => [...prev, { from: selectedNode, to: id }])
+          // Find the nodes to calculate distance
+          const sourceNode = nodes.find((n) => n.id === selectedNode)
+          const targetNode = nodes.find((n) => n.id === id)
+
+          if (sourceNode && targetNode) {
+            // Calculate weight based on distance
+            const weight = calculateDistance(sourceNode.x, sourceNode.y, targetNode.x, targetNode.y)
+
+            // Add the new edge with weight
+            setEdges((prev) => [...prev, { from: selectedNode, to: id, weight }])
+          }
         }
         setSelectedNode(null)
       }
@@ -114,7 +131,33 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
 
+    // Update node position
     setNodes(nodes.map((node) => (node.id === draggingNode ? { ...node, x, y } : node)))
+
+    // Update weights of connected edges
+    setEdges(
+      edges.map((edge) => {
+        if (edge.from === draggingNode || edge.to === draggingNode) {
+          const sourceNode = nodes.find((n) => n.id === edge.from)
+          const targetNode = nodes.find((n) => n.id === edge.to)
+
+          if (sourceNode && targetNode) {
+            // If the dragged node is the source, use the new coordinates
+            const sourceX = edge.from === draggingNode ? x : sourceNode.x
+            const sourceY = edge.from === draggingNode ? y : sourceNode.y
+
+            // If the dragged node is the target, use the new coordinates
+            const targetX = edge.to === draggingNode ? x : targetNode.x
+            const targetY = edge.to === draggingNode ? y : targetNode.y
+
+            // Calculate new weight
+            const weight = calculateDistance(sourceX, sourceY, targetX, targetY)
+            return { ...edge, weight }
+          }
+        }
+        return edge
+      }),
+    )
   }
 
   // End dragging
@@ -241,6 +284,18 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
           const strokeWidth = edge.animating ? 3 : 2
           const strokeDasharray = edge.animating ? "5,5" : "none"
 
+          // Calculate midpoint for weight label
+          const midX = (source.x + target.x) / 2
+          const midY = (source.y + target.y) / 2
+
+          // Offset the label slightly to not overlap the line
+          const dx = target.x - source.x
+          const dy = target.y - source.y
+          const angle = Math.atan2(dy, dx)
+          const offset = 10
+          const labelX = midX + offset * Math.sin(angle)
+          const labelY = midY - offset * Math.cos(angle)
+
           return (
             <div
               key={`edge-${i}`}
@@ -262,6 +317,20 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
                   onClick={(e) => handleEdgeClick(edge, e)}
                   style={{ cursor: mode === "delete" ? "pointer" : "default" }}
                 />
+
+                {/* Weight label */}
+                <text
+                  x={labelX}
+                  y={labelY}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="black"
+                  fontSize="12"
+                  fontWeight="bold"
+                  className="pointer-events-none bg-white px-1"
+                >
+                  <tspan className="bg-white px-1 py-0.5 rounded">{edge.weight}</tspan>
+                </text>
               </svg>
             </div>
           )
@@ -278,6 +347,13 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
 
             if (!fromNode || !toNode) return null
 
+            // Calculate potential weight
+            const weight = calculateDistance(fromNode.x, fromNode.y, toNode.x, toNode.y)
+
+            // Calculate midpoint for weight label
+            const midX = (fromNode.x + toNode.x) / 2
+            const midY = (fromNode.y + toNode.y) / 2
+
             return (
               <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
                 <svg width="100%" height="100%" className="absolute top-0 left-0">
@@ -290,6 +366,20 @@ export default function GraphCanvas({ nodes, setNodes, edges, setEdges }: GraphC
                     strokeWidth={2}
                     strokeDasharray="5,5"
                   />
+
+                  {/* Potential weight label */}
+                  <text
+                    x={midX}
+                    y={midY}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="gray"
+                    fontSize="12"
+                    fontWeight="bold"
+                    className="pointer-events-none"
+                  >
+                    <tspan className="bg-white/80 px-1 py-0.5 rounded">{weight}</tspan>
+                  </text>
                 </svg>
               </div>
             )
